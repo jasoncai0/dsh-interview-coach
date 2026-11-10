@@ -38,7 +38,24 @@
     "docs",
     "icon.svg",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "screenshots.json"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jasoncai0/dsh-interview-coach.git"
+  },
+  "homepage": "https://github.com/jasoncai0/dsh-interview-coach#readme",
+  "bugs": {
+    "url": "https://github.com/jasoncai0/dsh-interview-coach/issues"
+  },
+  "author": "jasoncai0",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "interview",
+    "mock-interview",
+    "agent"
+  ]
 }

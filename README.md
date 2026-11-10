@@ -37,6 +37,12 @@ Mock-first 面试教练插件：把 Agent / LLM 应用开发题库、简历优�
 - 联网搜索：当前答案只基于 Setup 记忆 + 题库；`ctx.web.search` 尚未接入，避免在无搜索 provider 时阻塞 Mock。
 - 屏幕共享保护：`shell.overlay` 是 HTML 层，无法从屏幕捕获中排除；正式面试请使用第二块屏幕/手机，或明确接受暴露风险。
 
+## 截图
+
+![选择身份](docs/screenshots/role-chooser.png)
+
+![面试官计划](docs/screenshots/interviewer-plan.png)
+
 ## 安装
 
 在 DSH 中通过 Plugin Manager 安装本目录（不要手改 profile）：
