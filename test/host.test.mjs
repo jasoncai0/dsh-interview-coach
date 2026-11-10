@@ -36,6 +36,41 @@ function makeHarness() {
       },
       async *stream({ messages } = {}) {
         const system = messages?.[0]?.content?.[0]?.text ?? ''
+        if (system.includes('个性化题库生成模块')) {
+          yield {
+            type: 'text-delta',
+            text: JSON.stringify({
+              questions: [
+                {
+                  level: 'L2',
+                  topic: '简历追问',
+                  question: '你简历里的推荐系统重构，为什么先做检索层而不是重排层？',
+                  intent: '验证项目取舍',
+                  keyPoints: ['说清瓶颈', '说清取舍', '说清结果'],
+                  sampleAnswer: '当时瓶颈在召回，先改检索层能用更低成本拿到收益。',
+                  followups: ['怎么验证是召回瓶颈？'],
+                  redFlags: ['只讲团队成果'],
+                  provenance: ['card-1'],
+                  tags: ['personal', 'resume'],
+                },
+                {
+                  level: 'L4',
+                  topic: 'JD 匹配',
+                  question: '目标 JD 要求 Agent 运行时，你哪段经历能证明你处理过工具失败？',
+                  intent: '验证 JD 匹配',
+                  keyPoints: ['具体案例', '失败处理', '指标'],
+                  sampleAnswer: '可以从工具调用失败后的重试和降级讲起。',
+                  followups: ['怎么避免重试风暴？'],
+                  redFlags: ['只说了解 MCP'],
+                  provenance: ['card-2'],
+                  tags: ['personal', 'jd'],
+                },
+              ],
+            }),
+          }
+          yield { type: 'finish', kind: 'stop' }
+          return
+        }
         if (system.includes('补充提问模块')) {
           yield {
             type: 'text-delta',
@@ -244,6 +279,59 @@ test('host supports setup → mock → answer → finish → state', async () =>
     assert.equal(after.status, 200)
     assert.equal(after.json.session, null)
     assert.equal(after.json.report.averageScore, 82)
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+
+test('host generates, adopts, and uses personal questions', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'interview-coach-personal-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = root
+  try {
+    const { routes, ctx } = makeHarness()
+    apply(ctx, { provider: 'deepseek-account', model: 'deepseek-flash' })
+
+    const setup = await call(routes, '/interview-coach/setup', 'POST', {
+      resumeText: '负责推荐系统重构，P99 从 2s 降到 300ms。\n负责 Agent 工具运行时，处理过工具超时和降级。',
+      targetRole: 'Agent 开发工程师',
+    })
+    assert.equal(setup.status, 200)
+
+    const generated = await call(routes, '/interview-coach/personal/generate', 'POST', { count: 2 })
+    assert.equal(generated.status, 200)
+    assert.equal(generated.json.questions.length, 2)
+    assert.equal(generated.json.source, 'llm')
+
+    const adopted = await call(routes, '/interview-coach/personal/adopt', 'POST', { questions: generated.json.questions })
+    assert.equal(adopted.status, 200)
+    assert.equal(adopted.json.added, 2)
+    assert.equal(adopted.json.bank.personal, 2)
+    assert.equal(adopted.json.bank.total, 122)
+    assert.match(adopted.json.questions[0].id, /^P-/)
+
+    const state = await call(routes, '/interview-coach/state')
+    assert.equal(state.json.bank.personal, 2)
+    assert.equal(state.json.bank.total, 122)
+
+    const started = await call(routes, '/interview-coach/mock/start', 'POST', { count: 2, scope: 'personal' })
+    assert.equal(started.status, 200)
+    assert.equal(started.json.session.scope, 'personal')
+    assert.equal(started.json.total, 2)
+
+    const used = await call(routes, '/interview-coach/personal/delete', 'POST', { id: adopted.json.questions[0].id })
+    assert.equal(used.status, 409)
+    assert.equal(used.json.error.code, 'PERSONAL_IN_USE')
+
+    const reset = await call(routes, '/interview-coach/mock/start', 'POST', { count: 2, scope: 'preset' })
+    assert.equal(reset.status, 200)
+    const deleted = await call(routes, '/interview-coach/personal/delete', 'POST', { id: adopted.json.questions[0].id })
+    assert.equal(deleted.status, 200)
+    assert.equal(deleted.json.removed, 1)
+    assert.equal(deleted.json.bank.personal, 1)
   } finally {
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous

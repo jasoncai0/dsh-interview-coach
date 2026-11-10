@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { aggregateReport, extractJson, fallbackFeedback, generateSupplement, normalizeFeedback } from '../lib/coach.js'
+import { aggregateReport, extractJson, fallbackFeedback, generatePersonalQuestions, generateSupplement, normalizeFeedback, normalizePersonalQuestions } from '../lib/coach.js'
 
 const bankQuestion = {
   keyPoints: ['先给结论', '讲清混合检索机制', '给出 P99 和召回指标'],
@@ -152,4 +152,45 @@ test('supplement fallback answers from the reference and still offers next quest
   assert.match(result.answer, /参考答案/)
   assert.equal(result.next_questions.length >= 2, true)
   assert.equal(result.next_questions.includes('工具报错时怎么收敛？'), false)
+})
+
+
+test('personal question generation falls back to grounded resume questions', async () => {
+  const result = await generatePersonalQuestions(
+    {},
+    {},
+    {
+      cards: [
+        { id: 'resume-1', source: 'resume', title: '简历', text: '负责推荐系统重构，P99 从 2s 降到 300ms。' },
+        { id: 'jd-1', source: 'jd', title: '目标 JD', text: '要求 Agent 运行时和工具调用经验。' },
+      ],
+      profile: { targetRole: 'Agent 开发工程师' },
+      count: 2,
+    },
+  )
+  assert.equal(result.source, 'bank-fallback')
+  assert.equal(result.questions.length, 2)
+  assert.match(result.questions[0].question, /推荐系统|Agent/)
+  assert.equal(result.questions[0].source, 'personal')
+  assert.equal(result.questions[0].provenance.length, 1)
+  assert.equal(result.questions[0].keyPoints.length, 3)
+})
+
+test('normalize personal questions keeps valid levels and drops duplicates', () => {
+  const questions = normalizePersonalQuestions(
+    {
+      questions: [
+        { level: 'L9', topic: '简历', question: '你简历里的推荐系统为什么先做召回？', keyPoints: ['瓶颈'], sampleAnswer: '因为召回是瓶颈。', followups: ['怎么验证？'], redFlags: ['只讲团队'], provenance: ['resume-1'] },
+        { level: 'L2', topic: '简历', question: '你简历里的推荐系统为什么先做召回？' },
+        { level: 'L4', topic: 'JD', question: '目标 JD 要求 Agent 运行时，你哪段经历能证明？', keyPoints: ['案例', '指标'], sampleAnswer: '从工具失败处理讲起。' },
+      ],
+    },
+    [],
+    10,
+  )
+  assert.equal(questions.length, 2)
+  assert.equal(questions[0].level, 'L2')
+  assert.equal(questions[1].level, 'L4')
+  assert.equal(questions[0].source, 'personal')
+  assert.equal(questions[0].personal, true)
 })

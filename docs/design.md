@@ -10,7 +10,7 @@
 4. 复盘：逐题分数、重复缺口、维度分和下一轮动作。
 5. 常驻 HUD：答题时只显示题号/计时，不展示答案。
 
-## 非目标（0.2.0）
+## 非目标（0.4.0）
 
 - 不采集系统音频/视频，不接 BlackHole、摄像头或手机。
 - 不接实时 ASR；Mock 使用文字题卡。
@@ -45,6 +45,7 @@ $DSH_HOME/storages/interview-coach/
   profile.json   简历/JD/补充材料原文、目标岗位、来源文件名
   memory.json    记忆卡片、来源权重、时间戳
   sessions.json  Mock 会话、逐题回答、反馈、深挖链、复盘
+  personal-bank.json  “我的题”：从简历/JD/补充材料生成、用户确认加入的个性化题
 ```
 
 所有写入使用临时文件 + rename 原子替换。记忆 embedding 不落盘，加载时重建。
@@ -88,9 +89,26 @@ $DSH_HOME/storages/interview-coach/
 
 模型不可用、超时或 JSON 非法时，回退到题库参考答案，并用关键点覆盖率做确定性评分，保证 Mock 不中断。
 
+## 个性化题库
+
+`lib/coach.js` 的 `generatePersonalQuestions` 从 `memory.json` 的记忆卡片生成个性化题，不读取外部网络：
+
+- 数量 1–20（UI 提供 5/10/20），默认约 60% 简历项目、20% JD、20% 技能深度/动机。
+- 每题包含 `level/topic/question/intent/keyPoints/sampleAnswer/followups/redFlags/provenance`。
+- 只使用提供的记忆卡片，不虚构项目、公司、职责或数字；没有记忆时返回空并提示先导入。
+- 生成结果先预览，用户点“加入我的题”后才写入 `personal-bank.json`；预置 `bank/agent.jsonl` 永不被改写。
+- 加入时按题干去重，分配 `P-001` 递增 ID，最多 60 道；删除时若正被 active Mock 使用则拒绝（`PERSONAL_IN_USE`）。
+- 记忆更新后不会静默覆盖已加入的题；旧题可能过期，由用户手动删除或重新生成。
+
+题源选择：
+
+- `preset`：只用 120 道预置题。
+- `personal`：只用“我的题”，为空时返回 `NO_PERSONAL_QUESTIONS`。
+- `mixed`（默认）：约 30% 从“我的题”取，其余从预置题取；两边都按层级/主题均衡。
+
 ## Mock 流程
 
-1. 从 120 题中按层级均衡抽题（默认 10 题）。
+1. 从 120 道预置题 + 本地“我的题”中按层级均衡抽题（默认 10 题，题源可选）。
 2. 候选人用自己的话回答；HUD 只显示题目/计时。
 3. 提交后生成 score、cue、short_answer、full_answer、gaps、suggestions、evidence。
 4. 可进入三层深挖：机制与细节 → 边界与权衡 → 实战与度量。
@@ -167,4 +185,5 @@ LLM 失败时回退到题库 `followups` / 关键点生成的选项，以及基�
 
 - P5：系统音频采集 + 面试官/候选人分离 + 火山官方流式 ASR。
 - P6：手机/视频采集与更完整的实时 HUD。
-- BGE-small ONNX、20 道个性化题、GitHub/博客抓取、联网搜索。
+- BGE-small ONNX、GitHub/博客抓取、联网搜索。
+- 个性化题的“资料变更后过期标记”和批量重新生成。
