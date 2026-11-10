@@ -149,6 +149,14 @@ test('host supports setup → mock → answer → finish → state', async () =>
     assert.equal(wrong.status, 409)
     assert.equal(wrong.json.error.code, 'QUESTION_OUT_OF_ORDER')
 
+    const missing = await call(routes, '/interview-coach/mock/answer', 'POST', {
+      sessionId: 'mock_missing',
+      questionId: firstId,
+      answer: '这轮会话已经不存在了',
+    })
+    assert.equal(missing.status, 404)
+    assert.equal(missing.json.error.code, 'SESSION_NOT_FOUND')
+
     const answered = await call(routes, '/interview-coach/mock/answer', 'POST', {
       sessionId: session.id,
       questionId: firstId,
