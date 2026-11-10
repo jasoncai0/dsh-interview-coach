@@ -27,7 +27,7 @@
                                 │ same-origin HTTP
 ┌───────────────────────────────▼──────────────────────────────────────┐
 │ Host plugin (`lib/index.js`)                                         │
-│  routes: state/setup/import/memory/bank/mock/drill/answer/finish     │
+│  routes: state/setup/import/memory/bank/mock/drill/supplement/personal │
 │  store:  $DSH_HOME/storages/interview-coach/*.json                   │
 │  memory: BM25 + local hashed vector + source weight                  │
 │  coach:  ctx.llm.stream + strict JSON + bank fallback                │
