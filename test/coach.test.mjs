@@ -30,6 +30,64 @@ test('fallback feedback rewards key-point coverage', () => {
   assert.equal(fallbackFeedback({ question: 'q', answer: '', memories: [], bankQuestion }).score, 0)
 })
 
+test('fallback answer review highlights covered claims and lists missing points', () => {
+  const strong = fallbackFeedback({
+    question: '怎么做混合检索？',
+    answer: '先给结论：我们用 BM25 加向量混合检索，并行召回后做 RRF 融合和 rerank，P99 从 2s 降到 300ms。',
+    memories: [],
+    bankQuestion,
+  })
+  assert.ok(strong.answer_review.highlights.length > 0)
+  assert.equal(strong.answer_review.highlights[0].quote.includes('BM25'), true)
+  assert.equal(Number.isInteger(strong.answer_review.highlights[0].start), true)
+  assert.ok(strong.answer_review.missing.length > 0)
+  assert.equal(strong.answer_review.corrections.length, 0)
+})
+
+test('answer review only accepts verbatim spans and keeps corrections and missing points', () => {
+  const answer = '我会先给结论：使用 BM25 加向量混合检索。\n\n这里我没有设置停止条件。'
+  const fallback = fallbackFeedback({ question: 'q', answer, memories: [], bankQuestion })
+  const normalized = normalizeFeedback(
+    {
+      answer_review: {
+        highlights: [
+          { quote: '我会先给结论：使用 BM25 加向量混合检索', comment: '结论清楚' },
+          { quote: '这句话不在回答里' },
+        ],
+        corrections: [{ quote: '我没有设置停止条件', problem: '缺少停止条件', fix: '应设置最大轮次和超时' }],
+        missing: [{ point: 'RRF 融合', explain: '混合检索需要说明融合方式' }],
+      },
+    },
+    fallback,
+    answer,
+  )
+  assert.equal(normalized.answer_review.highlights.length, 1)
+  assert.equal(normalized.answer_review.highlights[0].quote, '我会先给结论：使用 BM25 加向量混合检索')
+  assert.equal(normalized.answer_review.corrections.length, 1)
+  assert.equal(normalized.answer_review.corrections[0].quote, '我没有设置停止条件')
+  assert.equal(normalized.answer_review.corrections[0].fix, '应设置最大轮次和超时')
+  assert.equal(normalized.answer_review.missing[0].point, 'RRF 融合')
+})
+
+test('answer review tolerates whitespace differences and drops overlapping highlights', () => {
+  const answer = '先讲 结论\n再讲机制'
+  const fallback = fallbackFeedback({ question: 'q', answer, memories: [], bankQuestion })
+  const normalized = normalizeFeedback(
+    {
+      answer_review: {
+        highlights: [{ quote: '先讲结论' }, { quote: '再讲机制' }],
+        corrections: [{ quote: '再讲机制', problem: '不够具体', fix: '补充具体机制' }],
+      },
+    },
+    fallback,
+    answer,
+  )
+  assert.equal(normalized.answer_review.highlights.length, 1)
+  assert.equal(normalized.answer_review.highlights[0].quote, '先讲 结论')
+  assert.equal(normalized.answer_review.corrections.length, 1)
+  assert.equal(normalized.answer_review.corrections[0].quote, '再讲机制')
+})
+
 test('normalization keeps multi-line full answers and clamps score', () => {
   const fallback = fallbackFeedback({ question: 'q', answer: 'a', memories: [], bankQuestion })
   const normalized = normalizeFeedback(

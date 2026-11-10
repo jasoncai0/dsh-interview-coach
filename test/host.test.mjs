@@ -166,6 +166,9 @@ test('host supports setup → mock → answer → finish → state', async () =>
     assert.equal(answered.json.feedback.score, 82)
     assert.equal(answered.json.feedback.source, 'llm')
     assert.equal(answered.json.feedback.full_answer.includes('\n\n'), true)
+    assert.equal(Array.isArray(answered.json.feedback.answer_review.highlights), true)
+    assert.equal(Array.isArray(answered.json.feedback.answer_review.corrections), true)
+    assert.equal(Array.isArray(answered.json.feedback.answer_review.missing), true)
     assert.equal(answered.json.done, false)
 
     const idempotent = await call(routes, '/interview-coach/mock/answer', 'POST', {
