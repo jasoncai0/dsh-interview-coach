@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Interview Coach">
+  <defs>
+    <linearGradient id="bg" x1="20" y1="12" x2="236" y2="244" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1e3a8a"/>
+      <stop offset="0.55" stop-color="#172554"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="42" y1="34" x2="206" y2="196" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.04"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+  <rect x="18" y="18" width="220" height="220" rx="44" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
+  <path d="M54 66c0-17.7 14.3-32 32-32h84c17.7 0 32 14.3 32 32v76c0 17.7-14.3 32-32 32h-50l-34 26v-26h-2c-16.6 0-30-13.4-30-30V66Z" fill="url(#glow)" stroke="#ffffff" stroke-opacity="0.42" stroke-width="3"/>
+  <path d="M82 82h92" stroke="#ffffff" stroke-width="14" stroke-linecap="round"/>
+  <path d="M82 112h66" stroke="#ffffff" stroke-opacity="0.82" stroke-width="14" stroke-linecap="round"/>
+  <path d="M82 142h42" stroke="#ffffff" stroke-opacity="0.56" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="190" cy="190" r="34" fill="#f59e0b"/>
+  <path d="M174 180l16 16 16-16" fill="none" stroke="#0f172a" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M190 196v18" stroke="#0f172a" stroke-width="9" stroke-linecap="round"/>
+</svg>

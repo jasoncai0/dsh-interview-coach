@@ -1,0 +1,13 @@
+# dsh-interview-coach bundle patch
+#
+# Installed by `plugin_manager` (or the DSH plugin CLI). The row mounts the
+# host half; the web client half is loaded from `dsh.client` in package.json.
+- insert:
+    - id: interview-coach
+      name: 'dsh-interview-coach'
+      config:
+        provider: deepseek-account
+        model: deepseek-flash
+        mockQuestionCount: 10
+        embeddingProvider: local
+        ttsEnabled: false
