@@ -1,7 +1,7 @@
 {
   "name": "dsh-interview-coach",
-  "version": "0.5.0",
-  "description": "Mock-first Agent interview coach: question bank, resume-grounded memory, LLM feedback, and an always-on HUD inside DSH.",
+  "version": "0.6.0",
+  "description": "Interview coach for DeepSeek Harness: candidate Mock with resume memory and HUD, plus an evidence-first interviewer workspace.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

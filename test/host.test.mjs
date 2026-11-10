@@ -72,6 +72,57 @@ function makeHarness() {
           yield { type: 'finish', kind: 'stop' }
           return
         }
+        if (system.includes('只负责生成面试计划')) {
+          yield {
+            type: 'text-delta',
+            text: JSON.stringify({
+              questions: [
+                {
+                  level: 'L2',
+                  topic: 'RAG',
+                  question: '请讲一个你做过的 RAG 取舍。',
+                  intent: '验证检索与重排的取舍',
+                  lookFor: ['说清召回瓶颈', '说清 rerank 的收益', '有指标'],
+                  followups: ['怎么评估融合有效？'],
+                  redFlags: ['只讲概念'],
+                  timeBoxMin: 6,
+                },
+                {
+                  level: 'L3',
+                  topic: '工具运行时',
+                  question: '工具调用失败时，你怎么收敛？',
+                  intent: '验证失败处理',
+                  lookFor: ['重试', '降级', '停止条件'],
+                  followups: ['怎么防止重试风暴？'],
+                  redFlags: ['只说 try/catch'],
+                  timeBoxMin: 8,
+                },
+              ],
+            }),
+          }
+          yield { type: 'finish', kind: 'stop' }
+          return
+        }
+        if (system.includes('面试记录整理助手')) {
+          yield {
+            type: 'text-delta',
+            text: JSON.stringify({
+              summary: '候选人有检索优化经验，工具失败处理讲得较浅。',
+              dimensions: [
+                { key: 'technical_depth', score: 4, evidence: ['召回率从 70% 提到 88%'] },
+                { key: 'problem_solving', score: 3, evidence: ['能讲清指标'] },
+                { key: 'communication', score: 3, evidence: ['能讲清指标'] },
+                { key: 'role_match', score: 3, evidence: ['能讲清指标'] },
+              ],
+              strengths: ['有指标'],
+              risks: ['工具失败处理缺少停止条件'],
+              recommendation: 'hire',
+              next_steps: ['补问重试风暴和停止条件'],
+            }),
+          }
+          yield { type: 'finish', kind: 'stop' }
+          return
+        }
         if (system.includes('补充提问模块')) {
           yield {
             type: 'text-delta',
@@ -406,6 +457,132 @@ test('host generates, adopts, and uses personal questions', async () => {
     assert.equal(deleted.status, 200)
     assert.equal(deleted.json.removed, 1)
     assert.equal(deleted.json.bank.personal, 1)
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+
+test('host supports interviewer role, isolated candidate, plan, interview, and report', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'interview-coach-interviewer-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = root
+  try {
+    const { routes, ctx } = makeHarness()
+    apply(ctx, { provider: 'deepseek-account', model: 'deepseek-flash' })
+
+    const setup = await call(routes, '/interview-coach/setup', 'POST', {
+      resumeText: '负责推荐系统重构，召回率从 70% 提到 88%。',
+      targetRole: 'Agent 开发工程师',
+    })
+    assert.equal(setup.status, 200)
+
+    const candidateRole = await call(routes, '/interview-coach/role', 'POST', { role: 'candidate' })
+    assert.equal(candidateRole.status, 200)
+    const candidateState = await call(routes, '/interview-coach/state')
+    assert.equal(candidateState.json.role, 'candidate')
+    assert.equal(candidateState.json.interviewer, undefined)
+
+    const role = await call(routes, '/interview-coach/role', 'POST', { role: 'interviewer' })
+    assert.equal(role.status, 200)
+    const initial = await call(routes, '/interview-coach/state')
+    assert.equal(initial.status, 200)
+    assert.equal(initial.json.role, 'interviewer')
+    assert.ok(initial.json.interviewer)
+    assert.equal(initial.json.interviewer.bank.personal, 0)
+    assert.equal(initial.json.memory, undefined)
+    assert.equal(initial.json.answers, undefined)
+
+    const candidate = await call(routes, '/interview-coach/interviewer/candidate', 'POST', {
+      name: '候选人 A',
+      targetRole: 'Agent 开发工程师',
+      level: 'P6',
+      round: '技术面',
+      durationMin: 45,
+      jdText: '需要 RAG、Agent 工具运行时和评测经验。',
+      resumeText: '负责推荐系统重构，召回率从 70% 提到 88%。\n负责 Agent 工具运行时。',
+    })
+    assert.equal(candidate.status, 200)
+    assert.match(candidate.json.candidate.id, /^c_/)
+    assert.ok(candidate.json.memory.total > 0)
+
+    const generated = await call(routes, '/interview-coach/interviewer/plan/generate', 'POST', {
+      count: 2,
+      candidateId: candidate.json.candidate.id,
+    })
+    assert.equal(generated.status, 200)
+    assert.equal(generated.json.source, 'llm')
+    assert.equal(generated.json.questions.length, 2)
+
+    const saved = await call(routes, '/interview-coach/interviewer/plan', 'POST', {
+      candidateId: candidate.json.candidate.id,
+      questions: generated.json.questions,
+    })
+    assert.equal(saved.status, 200)
+    assert.equal(saved.json.plan.status, 'ready')
+    assert.equal(saved.json.plan.questions.length, 2)
+
+    const started = await call(routes, '/interview-coach/interviewer/start', 'POST', {})
+    assert.equal(started.status, 200)
+    assert.equal(started.json.session.status, 'active')
+    assert.equal(started.json.question.id, 'Q1')
+    assert.ok(started.json.question.lookFor.length >= 2)
+
+    const first = await call(routes, '/interview-coach/interviewer/answer', 'POST', {
+      sessionId: started.json.session.id,
+      questionId: 'Q1',
+      answer: '我先做召回，再做 rerank，召回率从 70% 提到 88%。',
+      notes: '能讲清指标',
+      signal: 'strong',
+    })
+    assert.equal(first.status, 200)
+    assert.equal(first.json.done, false)
+    assert.equal(first.json.nextQuestion.id, 'Q2')
+
+    const second = await call(routes, '/interview-coach/interviewer/answer', 'POST', {
+      sessionId: started.json.session.id,
+      questionId: 'Q2',
+      answer: '工具失败就重试一次，不行就降级。',
+      notes: '缺少停止条件',
+      signal: 'weak',
+    })
+    assert.equal(second.status, 200)
+    assert.equal(second.json.done, true)
+
+    const finished = await call(routes, '/interview-coach/interviewer/finish', 'POST', {
+      sessionId: started.json.session.id,
+    })
+    assert.equal(finished.status, 200)
+    assert.equal(finished.json.session.status, 'finished')
+    assert.equal(finished.json.report.dimensions.length, 4)
+    assert.equal(finished.json.report.dimensions[0].score, 4)
+    assert.equal(finished.json.report.recommendation, 'hire')
+
+    const report = await call(routes, `/interview-coach/interviewer/report?sessionId=${started.json.session.id}`)
+    assert.equal(report.status, 200)
+    assert.equal(report.json.report.summary.includes('检索'), true)
+
+    const edited = await call(routes, '/interview-coach/interviewer/report', 'POST', {
+      sessionId: started.json.session.id,
+      report: { ...finished.json.report, summary: '面试官修订：建议进入下一轮。' },
+    })
+    assert.equal(edited.status, 200)
+    assert.equal(edited.json.report.summary, '面试官修订：建议进入下一轮。')
+
+    const state = await call(routes, '/interview-coach/state')
+    assert.equal(state.json.role, 'interviewer')
+    assert.equal(state.json.interviewer.plan.status, 'done')
+    assert.equal(state.json.interviewer.report.summary, '面试官修订：建议进入下一轮。')
+    assert.equal(state.json.interviewer.bank.personal, 0)
+
+    const back = await call(routes, '/interview-coach/role', 'POST', { role: 'candidate' })
+    assert.equal(back.status, 200)
+    const candidateAgain = await call(routes, '/interview-coach/state')
+    assert.equal(candidateAgain.json.role, 'candidate')
+    assert.equal(candidateAgain.json.memory.total > 0, true)
+    assert.equal(candidateAgain.json.interviewer, undefined)
   } finally {
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
