@@ -148,6 +148,7 @@ test('supplement fallback answers from the reference and still offers next quest
     },
   )
   assert.equal(result.source, 'bank-fallback')
+  assert.match(result.reference_answer, /Thought-Action-Observation/)
   assert.match(result.answer, /参考答案/)
   assert.equal(result.next_questions.length >= 2, true)
   assert.equal(result.next_questions.includes('工具报错时怎么收敛？'), false)

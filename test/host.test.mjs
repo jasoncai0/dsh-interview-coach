@@ -40,6 +40,7 @@ function makeHarness() {
           yield {
             type: 'text-delta',
             text: JSON.stringify({
+              reference_answer: '我会用 RRF 融合两路召回：它只看排名，不依赖分数绝对尺度。k 先取 60，再用验证集调。',
               answer: '参考答案选择 RRF，是因为它不依赖两路分数的绝对尺度；k 通常取 60，再用验证集调。',
               evidence: [{ source: 'bank', text: '并行召回后做 RRF 融合和 rerank' }],
               next_questions: ['如果两路分数不可比怎么办？', '怎么验证融合有效？'],
@@ -185,6 +186,7 @@ test('host supports setup → mock → answer → finish → state', async () =>
       question: 'RRF 的 k 怎么选？',
     })
     assert.equal(supplement.status, 200)
+    assert.match(supplement.json.reference_answer, /RRF/)
     assert.match(supplement.json.answer, /RRF/)
     assert.equal(supplement.json.questions.length, 2)
     assert.equal(supplement.json.questions[0], '如果两路分数不可比怎么办？')
