@@ -39,6 +39,8 @@ Mock-first 面试教练插件：把 Agent / LLM 应用开发题库、简历优�
 
 ## 截图
 
+> 截图中的账号、项目与会话列表已打码。
+
 ![选择身份](docs/screenshots/role-chooser.png)
 
 ![面试官计划](docs/screenshots/interviewer-plan.png)
