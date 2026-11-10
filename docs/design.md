@@ -110,7 +110,7 @@ $DSH_HOME/storages/interview-coach/
 
 ## 补充提问
 
-主问题反馈下方自动生成 3 个围绕 `full_answer` 的问题，用户只需点击，不需要自己输入。问题聚焦参考答案中的机制、边界、指标或替代方案。
+主问题反馈下方自动生成 3 个围绕 `full_answer` 的问题，用户可以直接点击；也可以输入自己的追问。问题聚焦参考答案中的机制、边界、指标或替代方案。
 
 点击后调用 `POST /interview-coach/mock/supplement`，请求体：
 
@@ -118,7 +118,7 @@ $DSH_HOME/storages/interview-coach/
 {"sessionId":"mock_...","questionId":"L1-01","question":"工具报错时循环如何收敛？"}
 ```
 
-后端以 `full_answer` 为主要解释对象，结合简历记忆生成回答，并返回 2–3 个新的追问选项。回答记录在 `session.answers[].supplements[]` 下，不改变主问题评分；追问选项只保留未问过的，最多展示 6 个。
+后端以 `full_answer` 为主要解释对象，结合简历记忆生成回答，并返回 2–3 个新的追问选项。自定义问题与自动问题走同一接口、同一 Prompt；回答按顺序记录在 `session.answers[].supplements[]` 下，形成可反复追问的问答线程，不改变主问题评分；追问选项只保留未问过的，最多展示 6 个。
 
 Prompt 约束：
 

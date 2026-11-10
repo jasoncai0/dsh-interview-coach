@@ -191,7 +191,15 @@ test('host supports setup → mock → answer → finish → state', async () =>
       question: '如果两路分数不可比怎么办？',
     })
     assert.equal(supplementAgain.status, 200)
-    assert.equal(plugin.store.getSession(session.id).answers[0].supplements.length, 2)
+
+    const supplementCustom = await call(routes, '/interview-coach/mock/supplement', 'POST', {
+      sessionId: session.id,
+      questionId: firstId,
+      question: '为什么这里不直接用向量检索？',
+    })
+    assert.equal(supplementCustom.status, 200)
+    assert.equal(supplementCustom.json.question, '为什么这里不直接用向量检索？')
+    assert.equal(plugin.store.getSession(session.id).answers[0].supplements.length, 3)
 
     const drillStart = await call(routes, '/interview-coach/mock/drill/start', 'POST', {
       sessionId: session.id,
