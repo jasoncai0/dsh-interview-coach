@@ -34,7 +34,20 @@ function makeHarness() {
       listModels() {
         return ['fake-model']
       },
-      async *stream() {
+      async *stream({ messages } = {}) {
+        const system = messages?.[0]?.content?.[0]?.text ?? ''
+        if (system.includes('补充提问模块')) {
+          yield {
+            type: 'text-delta',
+            text: JSON.stringify({
+              answer: '参考答案选择 RRF，是因为它不依赖两路分数的绝对尺度；k 通常取 60，再用验证集调。',
+              evidence: [{ source: 'bank', text: '并行召回后做 RRF 融合和 rerank' }],
+              next_questions: ['如果两路分数不可比怎么办？', '怎么验证融合有效？'],
+            }),
+          }
+          yield { type: 'finish', kind: 'stop' }
+          return
+        }
         yield {
           type: 'text-delta',
           text: JSON.stringify({
@@ -48,6 +61,7 @@ function makeHarness() {
             gaps: ['缺少失败案例'],
             suggestions: ['补一个失败案例'],
             improved_answer: '改进版\n\n补上失败案例和王牌指标。',
+            supplement_questions: ['RRF 的 k 怎么选？', '两路分数不可比怎么办？', '怎么验证融合有效？'],
           }),
         }
         yield { type: 'finish', kind: 'stop' }
@@ -153,6 +167,23 @@ test('host supports setup → mock → answer → finish → state', async () =>
     })
     assert.equal(idempotent.status, 200)
     assert.equal(idempotent.json.idempotent, true)
+
+    const supplement = await call(routes, '/interview-coach/mock/supplement', 'POST', {
+      sessionId: session.id,
+      questionId: firstId,
+      question: 'RRF 的 k 怎么选？',
+    })
+    assert.equal(supplement.status, 200)
+    assert.match(supplement.json.answer, /RRF/)
+    assert.equal(supplement.json.questions.length, 2)
+    assert.equal(supplement.json.questions[0], '如果两路分数不可比怎么办？')
+    const supplementAgain = await call(routes, '/interview-coach/mock/supplement', 'POST', {
+      sessionId: session.id,
+      questionId: firstId,
+      question: '如果两路分数不可比怎么办？',
+    })
+    assert.equal(supplementAgain.status, 200)
+    assert.equal(plugin.store.getSession(session.id).answers[0].supplements.length, 2)
 
     const drillStart = await call(routes, '/interview-coach/mock/drill/start', 'POST', {
       sessionId: session.id,

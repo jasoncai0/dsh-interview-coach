@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { aggregateReport, extractJson, fallbackFeedback, normalizeFeedback } from '../lib/coach.js'
+import { aggregateReport, extractJson, fallbackFeedback, generateSupplement, normalizeFeedback } from '../lib/coach.js'
 
 const bankQuestion = {
   keyPoints: ['先给结论', '讲清混合检索机制', '给出 P99 和召回指标'],
@@ -25,6 +25,8 @@ test('fallback feedback rewards key-point coverage', () => {
   assert.ok(strong.score > weak.score)
   assert.ok(weak.gaps.length > 0)
   assert.ok(weak.suggestions.length > 0)
+  assert.equal(weak.supplement_questions.length, 3)
+  assert.ok(weak.supplement_questions.every((item) => item.length > 0))
   assert.equal(fallbackFeedback({ question: 'q', answer: '', memories: [], bankQuestion }).score, 0)
 })
 
@@ -41,6 +43,7 @@ test('normalization keeps multi-line full answers and clamps score', () => {
       gaps: ['缺少失败案例'],
       suggestions: ['补一个失败案例'],
       improved_answer: '改进版\n\n第二段',
+      supplement_questions: ['这个结论的边界是什么？', '还有别的替代方案吗？', '怎么验证有效？'],
     },
     fallback,
   )
@@ -48,6 +51,8 @@ test('normalization keeps multi-line full answers and clamps score', () => {
   assert.equal(normalized.full_answer.includes('\n\n'), true)
   assert.equal(normalized.improved_answer.includes('\n\n'), true)
   assert.equal(normalized.evidence[0].source, 'resume')
+  assert.equal(normalized.supplement_questions.length, 3)
+  assert.match(normalized.supplement_questions[0], /边界/)
 })
 
 test('extractJson handles fenced and prefixed output', () => {
@@ -69,4 +74,23 @@ test('aggregate report ranks repeated gaps', () => {
   assert.equal(report.improvements[0].gap, '没有量化结果')
   assert.equal(report.improvements[0].count, 2)
   assert.equal(report.questionCount, 2)
+})
+
+test('supplement fallback answers from the reference and still offers next questions', async () => {
+  const result = await generateSupplement(
+    {},
+    {},
+    {
+      mainQuestion: 'ReAct 怎么收敛？',
+      reference: 'ReAct 是 Thought-Action-Observation 循环。\n\n工程上要设置最大轮次和超时。',
+      candidateAnswer: '我会设置最大轮次。',
+      question: '工具报错时怎么收敛？',
+      memories: [],
+      bankQuestion: { followups: ['工具报错时怎么收敛？', '如何限制 Action 参数？'], keyPoints: ['最大轮次'], sampleAnswer: '设置最大轮次。' },
+    },
+  )
+  assert.equal(result.source, 'bank-fallback')
+  assert.match(result.answer, /参考答案/)
+  assert.equal(result.next_questions.length >= 2, true)
+  assert.equal(result.next_questions.includes('工具报错时怎么收敛？'), false)
 })
