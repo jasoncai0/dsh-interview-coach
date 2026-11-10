@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import test from 'node:test'
 import { apply } from '../lib/index.js'
+import { createStore } from '../lib/store.js'
 
 function makeHarness() {
   const routes = new Map()
@@ -107,9 +108,10 @@ function makeHarness() {
   return { routes, ctx, disposers }
 }
 
-function request(method, body) {
+function request(method, body, url = '/') {
   const stream = body === undefined ? Readable.from([]) : Readable.from([Buffer.from(JSON.stringify(body))])
   stream.method = method
+  stream.url = url
   return stream
 }
 
@@ -128,10 +130,11 @@ function response() {
 }
 
 async function call(routes, path, method = 'GET', body) {
-  const handler = routes.get(path)
-  assert.ok(handler, `missing route ${path}`)
+  const [pathname] = path.split('?')
+  const handler = routes.get(pathname)
+  assert.ok(handler, `missing route ${pathname}`)
   const res = response()
-  await handler(request(method, body), res)
+  await handler(request(method, body, path), res)
   const json = res.state.body ? JSON.parse(res.state.body) : null
   return { status: res.state.status, json }
 }
@@ -279,6 +282,33 @@ test('host supports setup → mock → answer → finish → state', async () =>
     assert.equal(after.status, 200)
     assert.equal(after.json.session, null)
     assert.equal(after.json.report.averageScore, 82)
+    assert.equal(after.json.answers.total, 4)
+
+    const answerLibrary = await call(routes, '/interview-coach/answers')
+    assert.equal(answerLibrary.status, 200)
+    assert.equal(answerLibrary.json.total, 4)
+    assert.equal(answerLibrary.json.items.length, 4)
+    assert.equal(answerLibrary.json.items.some((item) => item.kind === 'main'), true)
+    assert.equal(answerLibrary.json.items.some((item) => item.kind === 'drill'), true)
+
+    const searched = await call(routes, '/interview-coach/answers?q=第%202%20层')
+    assert.equal(searched.status, 200)
+    assert.equal(searched.json.total, 1)
+    assert.match(searched.json.items[0].answer, /第 2 层/)
+
+    const toFavorite = answerLibrary.json.items[0]
+    const favorite = await call(routes, '/interview-coach/answers/favorite', 'POST', {
+      id: toFavorite.id,
+      favorite: true,
+    })
+    assert.equal(favorite.status, 200)
+    assert.equal(favorite.json.item.favorite, true)
+    assert.equal(favorite.json.answers.favorites, 1)
+
+    const favorites = await call(routes, '/interview-coach/answers?favorite=1')
+    assert.equal(favorites.status, 200)
+    assert.equal(favorites.json.total, 1)
+    assert.equal(favorites.json.items[0].id, toFavorite.id)
   } finally {
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
@@ -286,6 +316,50 @@ test('host supports setup → mock → answer → finish → state', async () =>
   }
 })
 
+
+test('host backfills answer library from existing sessions', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'interview-coach-answer-backfill-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = root
+  try {
+    const seedRoot = join(root, 'storages', 'interview-coach')
+    const seed = createStore(seedRoot)
+    await seed.ready()
+    await seed.saveSession({
+      id: 'mock_backfill',
+      status: 'finished',
+      questionIds: ['L0-01'],
+      currentIndex: 1,
+      scope: 'preset',
+      answers: [
+        {
+          questionId: 'L0-01',
+          question: 'Agent 和固定 workflow 的本质区别是什么？',
+          answer: 'Agent 会根据 observation 动态决定下一步。',
+          submittedAt: 1234,
+          feedback: { score: 77, gaps: ['没有讲失败处理'] },
+        },
+      ],
+      createdAt: 1200,
+      finishedAt: 1300,
+    })
+
+    const { routes, ctx } = makeHarness()
+    const plugin = apply(ctx, { provider: 'deepseek-account', model: 'deepseek-flash' })
+    const state = await call(routes, '/interview-coach/state')
+    assert.equal(state.status, 200)
+    const records = plugin.store.getAnswerRecords()
+    assert.equal(records.length, 1)
+    assert.equal(records[0].id, 'mock_backfill:L0-01:main')
+    assert.equal(records[0].score, 77)
+    assert.equal(records[0].answer, 'Agent 会根据 observation 动态决定下一步。')
+    assert.equal(state.json.answers.total, 1)
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(root, { recursive: true, force: true })
+  }
+})
 
 test('host generates, adopts, and uses personal questions', async () => {
   const root = await mkdtemp(join(tmpdir(), 'interview-coach-personal-'))

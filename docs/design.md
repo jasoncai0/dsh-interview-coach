@@ -10,7 +10,7 @@
 4. 复盘：逐题分数、重复缺口、维度分和下一轮动作。
 5. 常驻 HUD：答题时只显示题号/计时，不展示答案。
 
-## 非目标（0.4.0）
+## 非目标（0.5.0）
 
 - 不采集系统音频/视频，不接 BlackHole、摄像头或手机。
 - 不接实时 ASR；Mock 使用文字题卡。
@@ -21,13 +21,13 @@
 
 ```text
 ┌──────────────────────────── DSH Web GUI ────────────────────────────┐
-│  Main panel: Setup / Mock / Review / Bank                           │
+│  Main panel: Setup / Mock / Review / Answers / Bank                 │
 │  HUD (`shell.overlay`): question + timer, answers hidden until submit│
 └───────────────────────────────┬──────────────────────────────────────┘
                                 │ same-origin HTTP
 ┌───────────────────────────────▼──────────────────────────────────────┐
 │ Host plugin (`lib/index.js`)                                         │
-│  routes: state/setup/import/memory/bank/mock/drill/supplement/personal │
+│  routes: state/setup/import/memory/bank/mock/drill/supplement/personal/answers │
 │  store:  $DSH_HOME/storages/interview-coach/*.json                   │
 │  memory: BM25 + local hashed vector + source weight                  │
 │  coach:  ctx.llm.stream + strict JSON + bank fallback                │
@@ -46,6 +46,7 @@ $DSH_HOME/storages/interview-coach/
   memory.json    记忆卡片、来源权重、时间戳
   sessions.json  Mock 会话、逐题回答、反馈、深挖链、复盘
   personal-bank.json  “我的题”：从简历/JD/补充材料生成、用户确认加入的个性化题
+  answer-bank.json    历史回答、分数、反馈、收藏状态
 ```
 
 所有写入使用临时文件 + rename 原子替换。记忆 embedding 不落盘，加载时重建。
@@ -173,6 +174,12 @@ Prompt 约束：
 - 追问选项只问问题、不给答案，12–30 字。
 
 LLM 失败时回退到题库 `followups` / 关键点生成的选项，以及基于 `full_answer` 的兜底解释，不阻塞主流程。
+
+## 回答库
+
+主题回答和深挖回答在提交后自动写入 `$DSH_HOME/storages/interview-coach/answer-bank.json`，按稳定 ID 去重：`<sessionId>:<questionId>:main` 和 `<sessionId>:<questionId>:drill:<level>`。插件启动时从已有 sessions 回填缺失记录，因此升级后旧回答也能出现在回答库。
+
+每条记录保留题目、回答、层级、主题、分数、反馈和母题（深挖）；用户可收藏，收藏状态在重复提交时保留。`GET /interview-coach/answers` 支持 `q`、`level`、`score=high|mid|low`、`favorite=1` 过滤，最多返回 100 条；`POST /interview-coach/answers/favorite` 只切换收藏，不改回答内容。回答库写入失败只记录日志，不阻塞 Mock 提交。
 
 ## 隐私与边界
 
