@@ -51,6 +51,12 @@ Mock-first 面试教练插件：把 Agent / LLM 应用开发题库、简历优�
 plugin_manager install_bundle  <本目录绝对路径>
 ```
 
+也可以直接从 GitHub 安装：
+
+```bash
+dsh plugin --profile <profile> add github:jasoncai0/dsh-interview-coach
+```
+
 安装后刷新 DSH Web GUI。插件会出现在侧边栏“面试教练”。配置在 `cordis.patch.yml`：
 
 ```yaml
