@@ -662,3 +662,53 @@ test('host supports interviewer role, isolated candidate, plan, interview, and r
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test('host can skip questions and records skipped count', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'interview-coach-skip-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = root
+  try {
+    const { routes, ctx } = makeHarness()
+    apply(ctx, { provider: 'deepseek-account', model: 'deepseek-flash' })
+    await call(routes, '/interview-coach/setup', 'POST', {
+      resumeText: '候选人做过 RAG 和 Agent 项目，负责检索和工具运行时。',
+      targetRole: 'Agent 开发工程师',
+    })
+    const started = await call(routes, '/interview-coach/mock/start', 'POST', { count: 3 })
+    assert.equal(started.status, 200)
+    const sessionId = started.json.session.id
+    const firstId = started.json.question.id
+
+    const skippedFirst = await call(routes, '/interview-coach/mock/skip', 'POST', { sessionId, questionId: firstId })
+    assert.equal(skippedFirst.status, 200)
+    assert.equal(skippedFirst.json.done, false)
+    assert.equal(skippedFirst.json.session.currentIndex, 1)
+    assert.equal(skippedFirst.json.session.skippedCount, 1)
+    assert.notEqual(skippedFirst.json.question.id, firstId)
+
+    const secondId = skippedFirst.json.question.id
+    const answered = await call(routes, '/interview-coach/mock/answer', 'POST', {
+      sessionId,
+      questionId: secondId,
+      answer: '先给结论，再讲检索融合和重排，最后补指标。',
+    })
+    assert.equal(answered.status, 200)
+    assert.equal(answered.json.feedback.score, 82)
+
+    const skippedLast = await call(routes, '/interview-coach/mock/skip', 'POST', { sessionId })
+    assert.equal(skippedLast.status, 200)
+    assert.equal(skippedLast.json.done, true)
+    assert.equal(skippedLast.json.question, null)
+    assert.equal(skippedLast.json.session.skippedCount, 2)
+
+    const finished = await call(routes, '/interview-coach/mock/finish', 'POST', { sessionId })
+    assert.equal(finished.status, 200)
+    assert.equal(finished.json.report.skippedCount, 2)
+    assert.equal(finished.json.report.questionCount, 1)
+    assert.equal(finished.json.session.skippedCount, 2)
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(root, { recursive: true, force: true })
+  }
+})

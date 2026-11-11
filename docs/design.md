@@ -54,6 +54,15 @@ $DSH_HOME/storages/interview-coach/
 
 所有写入使用临时文件 + rename 原子替换。记忆 embedding 不落盘，加载时重建。
 
+## 重新开始与跳过本题
+
+Mock 进行中提供两个操作：
+
+- `跳过本题`：把当前题加入 `session.skipped[]`，`currentIndex` 前进，不产生回答、不评分；最后一题跳过后显示“本场没有更多题目”，有回答时可生成复盘，复盘显示跳过题数。
+- `重新开始`：浏览器确认后调用 `/mock/start`，沿用当前题量和题目来源，旧 active session 标记为 `abandoned`；不继承当前回答。
+
+跳过不会改变已作答题目和平均分；`aggregateReport.skippedCount` 记录跳过数。
+
 ## 目录导入
 
 Setup 和面试官准备页都支持“导入目录”：浏览器递归选择文件夹，逐个调用 `/setup/import` 读取 `.txt` / `.md` / `.docx`，按相对路径分类：
