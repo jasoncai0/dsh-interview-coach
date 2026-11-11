@@ -156,6 +156,8 @@ function makeHarness({ hangPersonal = false, ignorePersonalAbort = false } = {})
             evidence: [{ source: 'resume', text: 'P99 从 2s 降到 300ms' }],
             followups: ['RRF 的 k 怎么选？'],
             score: 82,
+            claim_type: 'technical',
+            evidence_status: 'verified',
             strengths: ['有指标'],
             gaps: ['缺少失败案例'],
             suggestions: ['补一个失败案例'],
@@ -266,6 +268,8 @@ test('host supports setup → mock → answer → finish → state', async () =>
     assert.equal(answered.status, 200)
     assert.equal(answered.json.feedback.score, 82)
     assert.equal(answered.json.feedback.source, 'llm')
+    assert.equal(answered.json.feedback.claim_type, 'technical')
+    assert.equal(answered.json.feedback.evidence_status, 'verified')
     assert.equal(answered.json.feedback.full_answer.includes('\n\n'), true)
     assert.equal(Array.isArray(answered.json.feedback.answer_review.highlights), true)
     assert.equal(Array.isArray(answered.json.feedback.answer_review.corrections), true)

@@ -27,7 +27,12 @@ test('fallback feedback rewards key-point coverage', () => {
   assert.ok(weak.suggestions.length > 0)
   assert.equal(weak.supplement_questions.length, 3)
   assert.ok(weak.supplement_questions.every((item) => item.length > 0))
+  assert.equal(weak.evidence_status, 'unverified')
+  assert.equal(strong.evidence_status, 'verified')
+  assert.equal(strong.claim_type, 'technical')
+  assert.equal(fallbackFeedback({ question: 'P99 指标怎么定义？', answer: '我们优化了性能。', memories: [], bankQuestion }).claim_type, 'metric')
   assert.equal(fallbackFeedback({ question: 'q', answer: '', memories: [], bankQuestion }).score, 0)
+  assert.equal(fallbackFeedback({ question: 'q', answer: '', memories: [], bankQuestion }).evidence_status, 'not_covered')
 })
 
 test('fallback answer review highlights covered claims and lists missing points', () => {
@@ -111,6 +116,18 @@ test('normalization keeps multi-line full answers and clamps score', () => {
   assert.equal(normalized.evidence[0].source, 'resume')
   assert.equal(normalized.supplement_questions.length, 3)
   assert.match(normalized.supplement_questions[0], /边界/)
+  assert.equal(normalized.evidence_status, 'unverified')
+  assert.equal(normalized.claim_type, 'technical')
+
+  const uncovered = normalizeFeedback({ score: 88, evidence_status: 'not_covered', claim_type: 'metric' }, fallback)
+  assert.equal(uncovered.score, 0)
+  assert.equal(uncovered.evidence_status, 'not_covered')
+  assert.equal(uncovered.claim_type, 'metric')
+
+  const contradictory = normalizeFeedback({ score: 90, evidence_status: 'contradictory', claim_type: 'invalid' }, fallback)
+  assert.equal(contradictory.score, 35)
+  assert.equal(contradictory.evidence_status, 'contradictory')
+  assert.equal(contradictory.claim_type, 'technical')
 })
 
 test('extractJson handles fenced and prefixed output', () => {
@@ -180,9 +197,9 @@ test('normalize personal questions keeps valid levels and drops duplicates', () 
   const questions = normalizePersonalQuestions(
     {
       questions: [
-        { level: 'L9', topic: '简历', question: '你简历里的推荐系统为什么先做召回？', keyPoints: ['瓶颈'], sampleAnswer: '因为召回是瓶颈。', followups: ['怎么验证？'], redFlags: ['只讲团队'], provenance: ['resume-1'] },
+        { level: 'L9', topic: '简历', question: '你简历里的推荐系统为什么先做召回？', claimType: 'metric', keyPoints: ['瓶颈'], sampleAnswer: '因为召回是瓶颈。', followups: ['怎么验证？'], redFlags: ['只讲团队'], provenance: ['resume-1'] },
         { level: 'L2', topic: '简历', question: '你简历里的推荐系统为什么先做召回？' },
-        { level: 'L4', topic: 'JD', question: '目标 JD 要求 Agent 运行时，你哪段经历能证明？', keyPoints: ['案例', '指标'], sampleAnswer: '从工具失败处理讲起。' },
+        { level: 'L4', topic: 'JD', question: '目标 JD 要求 Agent 运行时，你哪段经历能证明？', claimType: 'ownership', keyPoints: ['案例', '指标'], sampleAnswer: '从工具失败处理讲起。' },
       ],
     },
     [],
@@ -193,4 +210,6 @@ test('normalize personal questions keeps valid levels and drops duplicates', () 
   assert.equal(questions[1].level, 'L4')
   assert.equal(questions[0].source, 'personal')
   assert.equal(questions[0].personal, true)
+  assert.equal(questions[0].claimType, 'metric')
+  assert.equal(questions[1].claimType, 'ownership')
 })
