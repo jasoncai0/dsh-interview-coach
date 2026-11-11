@@ -7,7 +7,7 @@ import test from 'node:test'
 import { apply } from '../lib/index.js'
 import { createStore } from '../lib/store.js'
 
-function makeHarness() {
+function makeHarness({ hangPersonal = false, ignorePersonalAbort = false } = {}) {
   const routes = new Map()
   const disposers = []
   const ctx = {
@@ -35,9 +35,20 @@ function makeHarness() {
       listModels() {
         return ['fake-model']
       },
-      async *stream({ messages } = {}) {
+      async *stream({ messages, signal } = {}) {
         const system = messages?.[0]?.content?.[0]?.text ?? ''
         if (system.includes('个性化题库生成模块')) {
+          if (hangPersonal) {
+            if (ignorePersonalAbort) {
+              await new Promise(() => {})
+            } else {
+              await new Promise((resolve, reject) => {
+                const fail = () => reject(Object.assign(new Error('aborted'), { name: 'AbortError', code: 'ABORTED' }))
+                if (signal?.aborted) return fail()
+                signal?.addEventListener('abort', fail, { once: true })
+              })
+            }
+          }
           yield {
             type: 'text-delta',
             text: JSON.stringify({
@@ -464,6 +475,61 @@ test('host generates, adopts, and uses personal questions', async () => {
   }
 })
 
+test('personal generation is bounded by a timeout and returns fallback questions', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'interview-coach-personal-timeout-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = root
+  try {
+    const { routes, ctx } = makeHarness({ hangPersonal: true })
+    apply(ctx, { provider: 'deepseek-account', model: 'deepseek-flash', personalTimeoutMs: 30 })
+
+    const setup = await call(routes, '/interview-coach/setup', 'POST', {
+      resumeText: '负责推荐系统重构，P99 从 2s 降到 300ms。',
+      targetRole: 'Agent 开发工程师',
+    })
+    assert.equal(setup.status, 200)
+
+    const startedAt = Date.now()
+    const generated = await call(routes, '/interview-coach/personal/generate', 'POST', { count: 3 })
+    assert.equal(generated.status, 200)
+    assert.equal(generated.json.timedOut, true)
+    assert.equal(generated.json.source, 'personal-fallback-timeout')
+    assert.ok(generated.json.questions.length > 0)
+    assert.ok(Date.now() - startedAt < 3000)
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('personal generation stays bounded when the provider ignores abort', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'interview-coach-personal-timeout-hard-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = root
+  try {
+    const { routes, ctx } = makeHarness({ hangPersonal: true, ignorePersonalAbort: true })
+    apply(ctx, { provider: 'deepseek-account', model: 'deepseek-flash', personalTimeoutMs: 30 })
+
+    const setup = await call(routes, '/interview-coach/setup', 'POST', {
+      resumeText: '负责推荐系统重构，P99 从 2s 降到 300ms。',
+      targetRole: 'Agent 开发工程师',
+    })
+    assert.equal(setup.status, 200)
+
+    const startedAt = Date.now()
+    const generated = await call(routes, '/interview-coach/personal/generate', 'POST', { count: 3 })
+    assert.equal(generated.status, 200)
+    assert.equal(generated.json.timedOut, true)
+    assert.equal(generated.json.source, 'personal-fallback-timeout')
+    assert.ok(generated.json.questions.length > 0)
+    assert.ok(Date.now() - startedAt < 3000)
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(root, { recursive: true, force: true })
+  }
+})
 
 test('host supports interviewer role, isolated candidate, plan, interview, and report', async () => {
   const root = await mkdtemp(join(tmpdir(), 'interview-coach-interviewer-'))

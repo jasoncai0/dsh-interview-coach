@@ -97,7 +97,8 @@ $DSH_HOME/storages/interview-coach/
 
 `lib/coach.js` 的 `generatePersonalQuestions` 从 `memory.json` 的记忆卡片生成个性化题，不读取外部网络：
 
-- 数量 1–20（UI 提供 5/10/20），默认约 60% 简历项目、20% JD、20% 技能深度/动机。
+- 数量 1–20（UI 提供 5/10/20，默认 5），默认约 60% 简历项目、20% JD、20% 技能深度/动机。
+- 单次生成最长等待 70 秒；模型超时或流迟迟不结束会自动中止，回到确定性的本地兜底题，界面显示已等待秒数和超时提示。
 - 每题包含 `level/topic/question/intent/keyPoints/sampleAnswer/followups/redFlags/provenance`。
 - 只使用提供的记忆卡片，不虚构项目、公司、职责或数字；没有记忆时返回空并提示先导入。
 - 生成结果先预览，用户点“加入我的题”后才写入 `personal-bank.json`；预置 `bank/agent.jsonl` 永不被改写。
