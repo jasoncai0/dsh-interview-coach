@@ -161,6 +161,7 @@ function makeHarness({ hangPersonal = false, ignorePersonalAbort = false } = {})
             strengths: ['有指标'],
             gaps: ['缺少失败案例'],
             suggestions: ['补一个失败案例'],
+            reference_answer: '参考口径：先讲状态与转移，再讲失败重试和退出边界。',
             improved_answer: '改进版\n\n补上失败案例和王牌指标。',
             supplement_questions: ['RRF 的 k 怎么选？', '两路分数不可比怎么办？', '怎么验证融合有效？'],
           }),
@@ -330,6 +331,7 @@ test('host supports setup → mock → answer → finish → state', async () =>
       })
       assert.equal(drillReply.status, 200)
       assert.equal(drillReply.json.feedback.score, 82)
+      assert.match(drillReply.json.feedback.reference_answer, /参考口径/)
       if (level < 3) assert.equal(drillReply.json.nextQuestion.level, level + 1)
     }
     assert.equal(drillReply.json.done, true)
@@ -342,6 +344,7 @@ test('host supports setup → mock → answer → finish → state', async () =>
     assert.equal(finished.json.report.drillCount, 3)
     assert.equal(finished.json.report.drillAverage, 82)
     assert.equal(finished.json.report.answers[0].drill.probes.length, 3)
+    assert.match(finished.json.report.answers[0].drill.probes[0].referenceAnswer, /参考口径/)
     assert.equal(finished.json.session.status, 'finished')
 
     const after = await call(routes, '/interview-coach/state')
