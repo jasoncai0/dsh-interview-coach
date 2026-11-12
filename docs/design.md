@@ -108,6 +108,8 @@ Setup 和面试官准备页都支持“导入目录”：浏览器递归选择�
 - 简历冲突时以简历为准；不虚构项目、指标、公司或职责。
 - 输出顺序：`cue`（3–5 条，≤28 字）→ `short_answer`（2–3 句）→ `full_answer`（45–90 秒口述量）。
 - Claim 类型：ownership / metric / technical / architecture / result / scenario；每题只验证当前答案提供的证据，不把“没提到”当成“不会”。
+- 评分五项：证据覆盖 0–40、正确性 0–20、个人边界 0–15、指标与边界 0–15、表达结构 0–10；总分必须等于五项之和，再按证据状态约束（未覆盖 0、矛盾 0–29、未验证 20–49、部分 50–74、已验证 75–92）。
+- `reference_score`：完整参考答案按同一五项标准自评，目标 78–84 分，最终展示校准到 78–84；用于检查“推荐回答是否真的达到强回答水平”，不与候选人分数混用。
 - Evidence status：verified / partial / unverified / contradictory / not_covered；`score` 只按本题当前回答的证据覆盖校准：not_covered=0、contradictory=0–35、unverified=15–40、partial=40–70、verified=70–100。
 - `full_answer` 固定「结论 → 2–3 个证据/动作 → 取舍/失败 → 指标口径/边界」；`improved_answer` 只改写已有内容，缺事实写【待补：...】。
 - 题库和网页只作参考；网页不得覆盖简历事实。

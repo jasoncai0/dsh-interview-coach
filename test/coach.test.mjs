@@ -110,7 +110,9 @@ test('normalization keeps multi-line full answers and clamps score', () => {
     },
     fallback,
   )
-  assert.equal(normalized.score, 100)
+  assert.equal(normalized.score, 49)
+  assert.equal(normalized.reference_score, 80)
+  assert.match(normalized.reference_score_reason, /80/)
   assert.equal(normalized.full_answer.includes('\n\n'), true)
   assert.equal(normalized.improved_answer.includes('\n\n'), true)
   assert.equal(normalized.evidence[0].source, 'resume')
@@ -125,9 +127,47 @@ test('normalization keeps multi-line full answers and clamps score', () => {
   assert.equal(uncovered.claim_type, 'metric')
 
   const contradictory = normalizeFeedback({ score: 90, evidence_status: 'contradictory', claim_type: 'invalid' }, fallback)
-  assert.equal(contradictory.score, 35)
+  assert.equal(contradictory.score, 29)
   assert.equal(contradictory.evidence_status, 'contradictory')
   assert.equal(contradictory.claim_type, 'technical')
+})
+
+test('score breakdown is summed and reference score is calibrated near 80', () => {
+  const fallback = fallbackFeedback({ question: 'q', answer: 'a', memories: [], bankQuestion })
+  const normalized = normalizeFeedback(
+    {
+      full_answer: '结论。\n\n证据和边界。',
+      evidence_status: 'verified',
+      claim_type: 'technical',
+      score: 99,
+      score_breakdown: { evidence: 32, correctness: 17, ownership: 12, metrics: 10, communication: 8 },
+      score_reason: '证据覆盖较好，指标口径还差一个来源。',
+      reference_score: 95,
+      reference_score_reason: '参考回答证据完整，表达略长。',
+    },
+    fallback,
+  )
+  assert.equal(normalized.score, 79)
+  assert.deepEqual(normalized.score_breakdown, {
+    evidence: 32,
+    correctness: 17,
+    ownership: 12,
+    metrics: 10,
+    communication: 8,
+  })
+  assert.equal(normalized.reference_score, 84)
+  assert.match(normalized.score_reason, /指标口径/)
+  assert.match(normalized.reference_score_reason, /参考回答/)
+})
+
+test('score bands cap inconsistent evidence statuses', () => {
+  const fallback = fallbackFeedback({ question: 'q', answer: 'a', memories: [], bankQuestion })
+  const verified = normalizeFeedback({ score: 99, evidence_status: 'verified' }, fallback)
+  const partial = normalizeFeedback({ score: 99, evidence_status: 'partial' }, fallback)
+  const unverified = normalizeFeedback({ score: 99, evidence_status: 'unverified' }, fallback)
+  assert.equal(verified.score, 92)
+  assert.equal(partial.score, 74)
+  assert.equal(unverified.score, 49)
 })
 
 test('extractJson handles fenced and prefixed output', () => {

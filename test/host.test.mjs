@@ -156,6 +156,10 @@ function makeHarness({ hangPersonal = false, ignorePersonalAbort = false } = {})
             evidence: [{ source: 'resume', text: 'P99 从 2s 降到 300ms' }],
             followups: ['RRF 的 k 怎么选？'],
             score: 82,
+            score_breakdown: { evidence: 33, correctness: 18, ownership: 12, metrics: 11, communication: 8 },
+            score_reason: '证据覆盖较完整，指标来源还差一句。',
+            reference_score: 81,
+            reference_score_reason: '参考回答结构完整，指标口径略简。',
             claim_type: 'technical',
             evidence_status: 'verified',
             strengths: ['有指标'],
@@ -268,6 +272,8 @@ test('host supports setup → mock → answer → finish → state', async () =>
     })
     assert.equal(answered.status, 200)
     assert.equal(answered.json.feedback.score, 82)
+    assert.equal(answered.json.feedback.reference_score, 81)
+    assert.match(answered.json.feedback.reference_score_reason, /参考回答/)
     assert.equal(answered.json.feedback.source, 'llm')
     assert.equal(answered.json.feedback.claim_type, 'technical')
     assert.equal(answered.json.feedback.evidence_status, 'verified')
