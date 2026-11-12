@@ -158,7 +158,8 @@ test('score breakdown is summed and reference score is calibrated near 80', () =
   assert.equal(normalized.reference_score, 84)
   assert.match(normalized.score_reason, /指标口径/)
   assert.match(normalized.reference_score_reason, /参考回答/)
-  assert.match(normalized.reference_score_reason, /目标区间校准/)
+  assert.match(normalized.reference_score_reason, /原始自评 95/)
+  assert.match(normalized.reference_score_reason, /展示分校准到 84/)
 })
 
 test('score bands cap inconsistent evidence statuses', () => {
